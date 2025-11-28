@@ -1,0 +1,435 @@
+---
+title: "Productivity estimates for the EAM by Shri Shri Sneha Manda"
+output: html_notebook
+---
+
+I have a rawdata file with estimated producity rates of each dominant species of benthic foraminifera in the Vermitid reefs of the Levant. In this notebook, I will primarily use dplyr, tidyverse and tidyr packages to clean/summaries/structure the data such that I can incorporate in with the file " Productivity Rates_barplot " that is being used in the R notebook : bf_prod_subtropics.Rmd
+
+```{r}
+#setting working directory
+
+setwd("E:/OneDrive - post.bgu.ac.il/Modern Foraminifera Projects/Carbonate Production")
+
+# load data - choose csv file (foram_prod_sm)
+sm.data <- read.csv(file.choose())
+
+# The unique() function in R returns a vector, data frame, or array-like object with duplicate elements and rows deleted.
+
+unique(sm.data$foram.type)
+
+str(sm.data)
+
+head(sm.data)
+```
+```{r}
+# To get average productivity rates, I need to summarise the data for each station, e.g: sum of all rows with the entry Akhziv
+
+
+sm.data %>%
+  group_by(Location, foram.type) %>%
+  summarize(TotalProduction = sum(carb_prod), na.rm = TRUE)
+
+sm.data %>%
+               group_by(Location) %>%
+               summarize(TotalProduction = sum(carb_prod), na.rm = TRUE)
+
+
+sm.data %>%
+               group_by(Size.wise.species, Location) %>%
+               summarize(TotalProduction = sum(carb_prod), na.rm = TRUE)
+```
+
+Okay, I have interesting information here. The carbonate production by foraminifera from the Mediterranean can go as high as 700 g m^-2 yr^-1. TO emphasize, this is MY model,  not Pamela Hallocks's tunover model revised by many authors to give obnoxious results. 
+
+I want to show this on a plot such that foraminiferal productivity rate from the Mediterranean can be compared to those of the global foraminiferal productivity rate. 
+
+```{r}
+# loading data file
+f.prod <- read.csv(file.choose())
+
+# file name: Productivity Rates_barplot (JNP_SM folder)
+# file name: global_foram_cprod_database ## cotains all edits and removal of replicate studies. 
+
+# The unique() function in R returns a vector, data frame, or array-like object with duplicate elements and rows deleted.
+
+unique(f.prod$Oceanic.region)
+
+str(f.prod)
+```
+I want to introduce 4 more rows to this dataframe such that they contain my data
+
+
+```{r}
+# Adding new rows to dataframe f.prod.small
+df.prod <- f.prod %>% 
+   add_row(Area = "Akhziv", Oceanic.region = "Mediterranean", worldloc   = "33 n", Latitude = 33, Hemisphere = "n", Estimated.Carbonate.production = 144, Reference = "This study" )
+```
+
+```{r}
+# creating new data frame
+
+# Create dataframe
+df = data.frame(Area=c("Shikmona", "Nahsholim", "Palmachim"),
+              Oceanic.region=c("Mediterranean", "Mediterranean", "Mediterranean"), 
+              worldloc = c("33 n", "33 n", "32 n"),
+              Latitude = c(33, 33, 32), 
+              Hemisphere = c("n", "n", "n"), 
+              Estimated.Carbonate.production = c(176, 187, 24), 
+              Reference = c("This study" , "This study" , "This study" ))
+
+df.prod.sneha <- rbind(df.prod, df)
+
+unique(df.prod.sneha$Oceanic.region)
+```
+
+```{r}
+# combining different variables
+
+# Let me try to minimize the ocean provinces to see the data better
+
+library(dplyr)
+
+f.prod.small <- df.prod.sneha %>%
+  mutate(Realm =case_when(
+    Oceanic.region=="Indian Ocean" | Oceanic.region=="Asian" ~ "Indian Ocean",
+    Oceanic.region=="Carribbean" | Oceanic.region=="n - atlantic" | Oceanic.region=="s - atlantic"~ "Atlantic", 
+    Oceanic.region=="Red Sea" | Oceanic.region=="Persian Gulf" ~ "Middle east", 
+    Oceanic.region=="s - pacific" | Oceanic.region=="s—pacific" ~ "South Pacific", 
+    Oceanic.region=="n - pacific" ~ "North Pacific",
+    Oceanic.region=="Mediterranean" ~ "Mediterranean", 
+  ))
+
+```
+
+```{r}
+
+color_realm <- c("#EFF3FF", "#C6DBEF", "#c15b4e","#9ECAE1", "#6BAED6" ,"#3182BD")
+
+plot <- ggplot(f.prod.small, aes(x=reorder(Realm, Estimated.Carbonate.production), y=Estimated.Carbonate.production, fill = Realm, color = Realm)) + 
+  geom_violin(outlier.shape = NA) +
+  geom_jitter(shape=16,  position=position_jitter(0.2), aes(colour = Realm, alpha = 0.5))+
+  scale_fill_grey()+
+  stat_summary(fun.y=mean, geom="point", size=2, color="black")+
+  ylim(0, 1200)+
+  #coord_flip()+
+  scale_fill_manual(values = color_realm)+
+  scale_colour_manual(values = color_realm)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  theme_bw()+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  ggtitle( bquote(Estimated~CaCO[.(3)]~production~by~reef-dwelling~benthic~foraminifera))+ 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.title.x=element_blank())+
+  labs (y = bquote(grams~m^2~y^-1)) +
+  theme(legend.position  = "none")
+
+plot
+```
+```{r}
+#pngfile <- fs::path(knitr::fig_path(),  "15.01.2024_foram_carb_prod_benthic_sm_data_coord_flip.png")
+pngfile <- fs::path(knitr::fig_path(),  "23.04.2024_foram_carb_prod_benthic_sm_data_coord_flip.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 30, height = 22, units = "cm", res = 300)
+plot(plot)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+
+```{r}
+#using this chunk of code to extract the colours from the "plot" in R notebook "bf_prod_subtropics" ( R_fill_brewer palette)
+ggplot_build(plot)$data
+```
+
+```{r}
+
+plot <- ggplot(f.prod.small, aes(x=reorder(Realm, Estimated.Carbonate.production), y=Estimated.Carbonate.production, fill = Realm, color = Realm)) + 
+  geom_violin(outlier.shape = NA) +
+  geom_jitter(shape=16,  position=position_jitter(0.2), aes(colour = Realm, alpha = 0.5))+
+  scale_fill_grey()+
+  stat_summary(fun.y=mean, geom="point", size=2, color="black")+
+  ylim(0, 1200)+
+  #coord_flip()+
+  scale_fill_manual(values = color_realm)+
+  scale_colour_manual(values = color_realm)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  theme_bw()+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  ggtitle( bquote(Estimated~CaCO[.(3)]~production~by~reef-dwelling~benthic~foraminifera))+ 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.title.x=element_blank())+
+  labs (y = bquote(grams~m^2~y^-1)) +
+  theme(legend.position  = "none")
+
+plot
+```
+
+
+```{r}
+#plotting results for Israeli MEditerrean by species 
+
+plot2 <- ggplot(sm.data, aes(x=reorder(Size.wise.species, -carb_prod), y=carb_prod, fill = Size.wise.species, color = Size.wise.species)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(shape=16,  position=position_jitter(0.2), aes(colour =Size.wise.species , alpha = 0.5))+
+  #scale_fill_grey()+
+  stat_summary(fun.y=mean, geom="point", size=2, color="black")+
+  #ylim(0, 1200)+
+  #coord_flip()+
+  scale_fill_manual(values = color_realm)+
+  scale_colour_manual(values = color_realm)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  theme_bw()+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #ggtitle( bquote(Estimated~CaCO[.(3)]~production~by~reef-dwelling~benthic~foraminifera))+ 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.title.x=element_blank())+
+  labs (y = bquote(grams~m^2~y^-1)) +
+  theme(legend.position  = "none")
+
+plot2
+
+```
+
+```{r}
+color_realm <- c("#EFF3FF", "#C6DBEF", "#c15b4e","#9ECAE1", "#6BAED6" ,"#3182BD")
+
+plot <- ggplot(f.prod.small, aes(x=reorder(Realm, Estimated.Carbonate.production), y=Estimated.Carbonate.production, fill = Realm, color = Realm)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(shape=16,  position=position_jitter(0.2), aes(colour = Realm, alpha = 0.5))+
+  scale_fill_grey()+
+  stat_summary(fun.y=mean, geom="point", size=2, color="black")+
+  ylim(0, 1000)+
+  #coord_flip()+
+  scale_fill_manual(values = color_realm)+
+  scale_colour_manual(values = color_realm)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #scale_fill_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  theme_bw()+
+  #scale_color_discrete_divergingx( palette = "ArmyRose", alpha = 1,rev= TRUE)+
+  #ggtitle( bquote(Estimated~CaCO[.(3)]~production~by~reef-dwelling~benthic~foraminifera))+ 
+  #theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(),      axis.title.x=element_blank())+
+  theme(plot.title = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.title.x=element_blank())+
+  #labs (y = bquote(grams~m^2~y^-1)) +
+  theme(legend.position  = "none")
+
+plot
+```
+```{r}
+write.csv(f.prod.small,"Table2_Manda_et_al_2024.csv") 
+```
+
+```{r}
+#pngfile <- fs::path(knitr::fig_path(),  "15.01.2024_foram_carb_prod_benthic_sm_data_coord_flip.png")
+#pngfile <- fs::path(knitr::fig_path(),  "11.08.2024_foram_carb_prod_benthic_sm_data_coord_flip.png")
+pngfile <- fs::path(knitr::fig_path(),  "10.02.2025_foram_carb_prod_benthic_sm_data_feb2025_updated_ylim1000_2.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 30, height = 22, units = "cm", res = 300)
+plot(plot)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+```{r}
+## Method 3: Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
+  ##   data: a data frame.
+  ##   measurevar: the name of a column that contains the variable to be summariezed
+  ##   groupvars: a vector containing names of columns that contain grouping variables
+  ##   na.rm: a boolean that indicates whether to ignore NA's
+  ##   conf.interval: the percent range of the confidence interval (default is 95%)
+  
+  
+  summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                        conf.interval=.95, .drop=TRUE) {
+    install.packages("plyr")
+    library(plyr)
+    
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+      if (na.rm) sum(!is.na(x))
+      else       length(x)
+    }
+    
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+                   .fun = function(xx, col) {
+                     c(N    = length2(xx[[col]], na.rm=na.rm),
+                       mean = mean   (xx[[col]], na.rm=na.rm),
+                       sd   = sd     (xx[[col]], na.rm=na.rm)
+                     )
+                   },
+                   measurevar
+    )
+    
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+    
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+    
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+    
+    return(datac)
+  }
+```
+
+```{r}
+hist(f.prod.small$Estimated.Carbonate.production, 
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams)")
+```
+```{r}
+boxplot(f.prod.small$Estimated.Carbonate.production, 
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams)", 
+     horizontal = TRUE)
+```
+```{r}
+#doing some stats on this, to nderstand the skweness of the dataset
+
+install.packages("moments")
+library(moments)
+
+#calculate skewness
+skewness(f.prod.small$Estimated.Carbonate.production)
+
+#calculate kurtosis
+kurtosis(f.prod.small$Estimated.Carbonate.production)
+
+#to test the nirmality of data distribution
+
+jarque.test(f.prod.small$Estimated.Carbonate.production)
+
+x <- runif(100)
+quantile(f.prod.small$Estimated.Carbonate.production,probs=c(.025,.95))
+
+qts <- quantile(f.prod.small$Estimated.Carbonate.production,probs=c(.05,.95))
+hist(f.prod.small$Estimated.Carbonate.production)
+abline(v=qts[1],col="red")
+abline(v=qts[2],col="red")
+
+qts <- quantile(f.prod.small$Estimated.Carbonate.production,probs=c(.05,.94))
+hist(f.prod.small$Estimated.Carbonate.production)
+abline(v=qts[1],col="green")
+abline(v=qts[2],col="green")
+```
+
+
+```{r}
+summary(f.prod.small$Estimated.Carbonate.production)
+
+#calculate range values
+range(f.prod.small$Estimated.Carbonate.production, na.rm=TRUE)
+```
+
+
+```{r}
+#Let me find out the outliers of this box plot
+
+boxplot.stats(f.prod.small$Estimated.Carbonate.production)$out
+
+#which of these points contribute to the outliers
+out <- boxplot.stats(f.prod.small$Estimated.Carbonate.production)$out
+out_ind <- which(f.prod.small$Estimated.Carbonate.production %in% c(out))
+out_ind
+```
+
+
+```{r}
+quartiles <- quantile(f.prod.small$Estimated.Carbonate.production)
+print(quartiles)
+```
+
+```{r}
+hist(f.prod$Estimated.Carbonate.production,
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams)")
+```
+```{r}
+#Extact GnBu color details from "Hcl" colourspace
+
+swatchplot(GnBu)
+
+palette2colors(GnBu, reverse = FALSE)
+```
+
+
+```{r}
+
+# View a single RColorBrewer palette by specifying its name
+display.brewer.pal(n = 8, name = 'GnBu')
+
+# Hexadecimal color specification 
+brewer.pal(n = 8, name = "GnBu")
+
+alldata <- boxplot(f.prod$Estimated.Carbonate.production, 
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams CaCO3 per sqm per year)", 
+     horizontal = TRUE)
+
+alldata
+
+#which of these points contribute to the outliers
+out <- boxplot.stats(f.prod$Estimated.Carbonate.production)$out
+out
+out_ind <- which(f.prod$Estimated.Carbonate.production %in% c(out))
+out_ind
+
+```
+
+```{r}
+pngfile <- fs::path(knitr::fig_path(),  "05.03.2025_all_foram_carb_prod.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 22, height = 12, units = "cm", res = 300)
+plot(alldata)
+invisible(dev.off())
+knitr::include_graphics(pngfile)
+```
+
+```{r}
+summary(f.prod$Estimated.Carbonate.production)
+```
+
+```{r}
+#calculate skewness
+skewness(f.prod$Estimated.Carbonate.production)
+
+#calculate kurtosis
+kurtosis(f.prod$Estimated.Carbonate.production)
+
+#to test the nirmality of data distribution
+
+jarque.test(f.prod$Estimated.Carbonate.production)
+
+x <- runif(100)
+quantile(f.prod$Estimated.Carbonate.production,probs=c(.025,.95))
+
+qts <- quantile(f.prod$Estimated.Carbonate.production,probs=c(.05,.95))
+hist(f.prod$Estimated.Carbonate.production, 
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams CaCO3 per sqm per year)")
+abline(v=qts[1],col="red")
+abline(v=qts[2],col="red")
+
+qts <- quantile(f.prod$Estimated.Carbonate.production,probs=c(.05,.94))
+hist(f.prod$Estimated.Carbonate.production,
+     main = "All records of benthic foraminiferal carbonate production",
+     xlab = "rate of carbonate production (grams CaCO3 per sqm per year)" )
+abline(v=qts[1],col="green")
+abline(v=qts[2],col="green")
+```
+```{r}
+#writing a table
+
+write.csv(f.prod.small, "/Users/snehamanda/Library/CloudStorage/OneDrive-post.bgu.ac.il/Modern Foraminifera Projects/Carbonate Production/Feb 2025/Suppl.Table2.csv", fileEncoding = "UTf-8")
+
+```
+

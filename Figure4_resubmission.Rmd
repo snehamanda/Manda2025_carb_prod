@@ -1,0 +1,327 @@
+---
+title: "tacked Bar graph - carbonate production contribution per species per sampling site"
+output: html_notebook
+---
+
+
+
+```{r}
+# raw data file #foram_prod_sm
+
+setwd("/Users/snehamanda/Library/CloudStorage/OneDrive-post.bgu.ac.il/Modern Foraminifera Projects/Carbonate Production/Carbonate stocks")
+
+#choose the file "foram_prod_eam_nov2025update"
+data <- read.csv(file.choose(), row.names=NULL)
+
+print(data)
+```
+
+```{r}
+# summarising the carbonate production potential per taxon
+  data %>% group_by(Location) %>%
+  summarize(production = sum(carb_prod))
+
+
+# Create a lookup table with the numeric values you want to correspond to each level of spray
+data$Location <- factor(
+  data$Location,
+  levels = c("Akhziv", "Shikmona", "Nahsholim", "Palmachim")
+)
+
+lookup = data.frame(station=levels(data$Location), stationNumeric=c(1.85, 4, 5.71, 12.5))
+#applying summary function on sub-setted dataframe
+data_m = merge(x=data,y=lookup,by.x='Location',by.y='station',all=TRUE)
+#data = merge(data, lookup, by= data$Location)
+
+data_m$Location <- factor(data_m$Location, 
+                          levels = c("Palmachim", "Nahsholim", "Shikmona", "Akhziv"))
+
+data_m$Taxon <- factor(data_m$Taxon , levels = c("Amphistegina", "soritids", "textularia", "peneroplis" ))
+
+colours <- c("#FEE799", "#C5E0B5", "#F2B06E", "#F8BDFF" )
+
+
+
+p <- ggplot(
+  subset(data, growth_rate == 1.5),  # data for only growth rate ==1.5
+  aes(x = stationNumeric, y = carb_prod, fill = Taxon)
+) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c(
+    "Amphistegina" = "#FEE799",
+    "soritids" = "#C5E0B5",
+    "textularia" = "#F2B06E",
+    "peneroplis" = "#F8BDFF"
+  )) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.title.x = element_blank(), 
+    axis.line.x = element_line(colour = "black", size = 0.5, linetype = "solid"), 
+    axis.text.x = element_text(face="plain", color="black", size=10, angle=0), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), 
+    legend.position = "right"
+  )
+
+plot_lbf <- p + coord_flip()
+
+##
+plot_lbf
+
+```
+```{r}
+p <- ggplot(
+  subset(data_m, growth_rate == 1.5),  # use merged data
+  aes(x = Location, y = carb_prod, fill = Taxon)
+) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c(
+    "Amphistegina" = "#FEE799",
+    "soritids" = "#C5E0B5",
+    "textularia" = "#F2B06E",
+    "peneroplis" = "#F8BDFF"
+  )) +
+  #scale_x_continuous(
+   # breaks = data_m$stationNumeric,
+    #labels = data_m$Location
+  #) +
+  coord_flip() +  # flip axes
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.title.x = element_blank(), 
+    axis.line.x = element_line(colour = "black", size = 0.5, linetype = "solid"), 
+    axis.text.x = element_text(face="plain", color="black", size=10, angle=0), 
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), 
+    legend.position = "none"
+  )
+
+plot_lbf <- p
+plot_lbf
+
+```
+
+```{r}
+setwd("/Users/snehamanda/Library/CloudStorage/OneDrive-post.bgu.ac.il/Modern Foraminifera Projects/Carbonate Production/Carbonate stocks")
+
+
+pngfile <- fs::path(knitr::fig_path(),  "26.11.2025_carb_prod_coord_flip.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 30, height = 22, units = "cm", res = 300)
+plot(plot_lbf)
+
+plot_lbf
+```
+
+
+### Testing sensitivity of the model ###
+```{r}
+# summarising the carbonate production potential per taxon
+total_carb <- data %>%
+  group_by(Location, growth_rate) %>%
+  summarise(
+    total_carb_prod = sum(carb_prod, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(total_carb)
+str(total_carb)
+str(data)
+
+total_carb$Location <- factor(total_carb$Location, levels = c("Akhziv","Shikmona", "Nahsholim","Palmachim" ))
+
+
+p <- ggplot(
+  total_carb,
+  aes(
+    x = Location,
+    y = total_carb_prod,
+    color = growth_rate == 1.5   # TRUE/FALSE
+  )
+) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red")) +
+  labs(color = "growth_rate = 1.5?")
+
+p
+```
+```{r}
+library(dplyr)
+
+summary_taxon <- data %>%
+  group_by(Location, Taxon) %>%
+  summarise(
+    mean_prod = mean(carb_prod, na.rm = TRUE),
+    min_prod  = min(carb_prod, na.rm = TRUE),
+    max_prod  = max(carb_prod, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+str(summary_taxon)
+```
+Trying to quanitfy senstivity of the model
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+summary_taxon <- data %>%
+  group_by(Location, Taxon) %>%
+  summarise(
+    mean_prod = mean(carb_prod),
+    min_prod  = min(carb_prod),
+    max_prod  = max(carb_prod),
+    sd_prod   = sd(carb_prod),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    range_sens = max_prod - min_prod,
+    cv_sens    = sd_prod / mean_prod,
+    perc_change_baseline = (max_prod - mean_prod) / mean_prod * 100
+  )
+
+# Your colors in correct Taxon order
+taxon_cols <- c(
+  "Amphistegina" = "#FEE799",
+  "soritids"     = "#C5E0B5",
+  "peneroplis"   = "#F8BDFF",
+  "textularia"   = "#F2B06E"
+)
+
+# Factor levels
+summary_taxon$Location <- factor(summary_taxon$Location, 
+                                 levels = c("Akhziv","Shikmona", "Nahsholim","Palmachim"))
+summary_taxon$Taxon <- factor(summary_taxon$Taxon, 
+                              levels = c("Amphistegina", "soritids", "textularia", "peneroplis"))
+
+baseline_df <- data %>%
+  filter(growth_rate == 1.5) %>%
+  group_by(Location, Taxon) %>%
+  summarise(carb_15 = mean(carb_prod, na.rm = TRUE), .groups = "drop") %>%
+  mutate(
+    Location = factor(Location, levels = c("Akhziv","Shikmona", "Nahsholim","Palmachim")),
+    Taxon = factor(Taxon, levels = c("Amphistegina", "soritids", "textularia", "peneroplis"))
+  )
+
+# Compute slope per Location × Taxon for ranking
+summary_taxon <- data %>%
+  group_by(Location, Taxon) %>%
+  summarise(
+    mean_prod = mean(carb_prod, na.rm = TRUE),
+    min_prod  = min(carb_prod, na.rm = TRUE),
+    max_prod  = max(carb_prod, na.rm = TRUE),
+    carb_15   = mean(carb_prod[growth_rate == 1.5], na.rm = TRUE),
+    slope     = if(n_distinct(growth_rate) > 1) coef(lm(carb_prod ~ growth_rate))[2] else NA_real_,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    range_prod = max_prod - min_prod,
+    rank_sensitivity = rank(-slope, ties.method = "first") # higher slope = higher sensitivity
+  )
+
+# Position dodge
+pd <- position_dodge(width = 0.6)
+
+# Plot
+ggplot(summary_taxon, aes(x = Location, y = mean_prod, color = Taxon, group = Taxon)) +
+  geom_errorbar(aes(ymin = min_prod, ymax = max_prod),
+                width = 0.1, size = 0.5, color = "gray", position = pd) +
+  geom_point(size = 4, shape = 19, position = pd) +
+  geom_point(data = baseline_df, aes(x = Location, y = carb_15),
+             color = "red", shape = 4, size = 3, stroke = 1.5, position = pd) +
+  geom_text(aes(label = rank_sensitivity, y = mean_prod + 0.2*range_prod),
+            position = pd, size = 4, color = "black") +
+  scale_color_manual(values = taxon_cols) +
+  labs(
+    y = "Carbonate Production by Taxon",
+    x = "Location",
+    title = "Model Sensitivity by Growth Rates",
+    color = "Taxon"
+  ) +
+  theme_minimal()
+
+```
+
+Interpreting model sensitivities
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(broom)
+
+# --- 1. Summary stats: mean, min, max, range, CV ---
+summary_metrics <- data %>%
+  group_by(Location, Taxon) %>%
+  summarise(
+    mean_prod = mean(carb_prod, na.rm = TRUE),
+    min_prod  = min(carb_prod, na.rm = TRUE),
+    max_prod  = max(carb_prod, na.rm = TRUE),
+    range_prod = max_prod - min_prod,
+    sd_prod   = sd(carb_prod, na.rm = TRUE),
+    cv_prod   = sd_prod / mean_prod,
+    .groups = "drop"
+  )
+
+# --- 2. Baseline at growth_rate = 1.5% ---
+baseline_df <- data %>%
+  filter(growth_rate == 1.5) %>%
+  group_by(Location, Taxon) %>%
+  summarise(carb_15 = mean(carb_prod, na.rm = TRUE), .groups = "drop")
+
+# Merge baseline
+summary_metrics <- summary_metrics %>%
+  left_join(baseline_df, by = c("Location", "Taxon")) %>%
+  mutate(
+    percent_change_from_1.5 = (max_prod - carb_15) / carb_15 * 100
+  )
+
+# --- 3. Sensitivity slope: production vs growth_rate ---
+slope_df <- data %>%
+  group_by(Location, Taxon) %>%
+  nest() %>%
+  mutate(
+    slope_info = map(data, ~ tidy(lm(carb_prod ~ growth_rate, data = .x)) %>% filter(term == "growth_rate"))
+  ) %>%
+  unnest(slope_info) %>%
+  select(Location, Taxon, slope = estimate, slope_se = std.error)
+
+# --- 4. Combine all metrics ---
+sensitivity_table <- summary_metrics %>%
+  left_join(slope_df, by = c("Location", "Taxon")) %>%
+  select(Location, Taxon, mean_prod, min_prod, max_prod,
+         range_prod, cv_prod, carb_15, percent_change_from_1.5,
+         slope, slope_se)
+
+# --- 5. View final table ---
+sensitivity_table
+
+```
+```{r}
+# Rank taxa per Location by slope (highest sensitivity first)
+sensitivity_table <- sensitivity_table %>%
+  group_by(Location) %>%
+  mutate(
+    rank_slope = rank(-slope, ties.method = "first"),      # higher slope = more sensitive
+    rank_range = rank(-range_prod, ties.method = "first")  # alternative: rank by absolute range
+  ) %>%
+  ungroup()
+
+# View table with ranking
+sensitivity_table
+
+# Export as CSV
+write.csv(sensitivity_table, 
+          file = "model_sensitivity_summary.csv", 
+          row.names = FALSE)
+
+```
+

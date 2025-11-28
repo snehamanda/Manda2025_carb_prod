@@ -1,0 +1,129 @@
+---
+title: "Stacked Bar graph - carbonate production contribution per species per sampling site"
+output: html_notebook
+---
+
+```{r}
+# raw data file #foram_prod_sm
+
+data <- read.csv(file.choose(), row.names=NULL)
+
+print(data)
+```
+
+```{r}
+# summarising the carbonate production potential per taxon
+  data %>% group_by(Location) %>%
+  summarize(production = sum(carb_prod))
+
+
+# Create a lookup table with the numeric values you want to correspond to each level of spray
+lookup = data.frame(station=levels(data$Location), stationNumeric=c(1.85, 4, 5.71, 12.5))
+#applying summary function on sub-setted dataframe
+data_m = merge(x=data,y=lookup,by.x='Location',by.y='station',all=TRUE)
+#data = merge(data, lookup, by= data$Location)
+
+data_m$Location <- factor(data_m$Location, levels = c("Palmachim", "Nahsholim", "Shikmona","Akhziv" ))
+
+data_m$Size.wise.species <- factor(data_m$Size.wise.species , levels = c("Amphistegina", "Sorites", "Peneroplis", "Textularia agglutinans", "Small BF"))
+
+colours <- c("#FEE799", "#C5E0B5", "#F8BDFF", "#F2B06E", "#AEAEAE")
+
+p <- ggplot(data_m, aes(x = Location, y = carb_prod, fill = Size.wise.species))+
+  geom_col( width = 0.7)+
+  scale_fill_manual(values = c("#FEE799", "#C5E0B5", "#F8BDFF", "#F2B06E", "#AEAEAE"))+
+  theme_minimal()
+  
+  
+
+ q = p + coord_flip()
+#+
+  #
+q
+```
+
+
+```{r}
+pngfile <- fs::path(knitr::fig_path(),  "10.02.2025_carb_prod_coord_flip.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 30, height = 22, units = "cm", res = 300)
+plot(q)
+
+q
+```
+
+```{r}
+# I will filter the data frame to have values of only LBFs and agglutinated
+
+install.packages("ggpattern")
+
+data_lbf <- filter(data, foram.type == "LBF" & Method == "Python Model")
+
+ggplot(data_lbf, aes(x = Location, y = carb_prod))+
+  geom_col(aes(fill = Species), width = 0.7)
+```
+```{r}
+
+#adding a new coloumn "graphloc" based on the sampling locations. I am doing this so that I can fit the graph on the pre-made ISrael map without any graphic manipulations. 
+
+data<- data %>%
+  mutate(graphloc =case_when(
+    Location=="Akhziv"  ~ "-1.85",
+    Location=="Shikmona"  ~ "-4",
+    Location=="Nahsholim"  ~ "-5.71",
+    Location=="Palmachim"  ~ "-12.5", 
+  ))
+
+# converting a charecter coloumn into  numeric coloumn 
+
+str(data)
+
+data$graphloc <- as.numeric(as.character(data$graphloc))
+sapply(data, class)
+
+str(data) # checking to make sure my operation has bveen succesful
+
+
+data$Location <- factor(data$Location, levels = c("Palmachim", "Nahsholim", "Shikmona","Akhziv" ))
+
+data$Size.wise.species <- factor(data$Size.wise.species , levels = c("Amphistegina", "Sorites", "Peneroplis", "Textularia agglutinans", "Small BF"))
+
+colours <- c("#FEE799", "#C5E0B5", "#F8BDFF", "#F2B06E", "#AEAEAE")
+
+
+
+p <- ggplot(data, aes(x = graphloc, y = carb_prod, fill = Size.wise.species))+
+  geom_col( width = 1.5)+
+  scale_fill_manual(values = c("#FEE799", "#C5E0B5", "#F8BDFF", "#F2B06E", "#AEAEAE"))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.title.x=element_blank(), 
+        axis.line.x = element_line(colour = "black", 
+                      size = 0.5, linetype = "solid"), 
+        axis.text.x = element_text(face="plain", color="black", 
+                           size=10, angle=0), 
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), 
+        legend.position  = "none")
+
+plot <- p + coord_flip()
+
+plot
+```
+```{r}
+
+setwd("/Users/snehamanda/Library/CloudStorage/OneDrive-post.bgu.ac.il/Modern Foraminifera Projects/Carbonate Production/Carbonate stocks")
+
+
+pngfile <- fs::path(knitr::fig_path(),  "10.02.2025_carb_prod_coord_flip.png")
+# I'm explicitly calling the device functions so you can see the dimensions 
+# used
+agg_png(pngfile, width = 30, height = 22, units = "cm", res = 300)
+plot(plot)
+
+plot
+```
+
